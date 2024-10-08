@@ -1,4 +1,7 @@
 streamlit
+replicate
 langchain
 langchain-core
 langchain-community
+openai 
+pydantic
