@@ -1,27 +1,29 @@
-# chatbot.py
-# Import necessary modules
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.llms import Ollama
 import streamlit as st
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+from huggingface_hub import login
 
-# Define a prompt template for the chatbot
-prompt=ChatPromptTemplate.from_messages(
-    [
-        ("system","You are a helpful assistant. Please response to the questions"),
-        ("user","Question:{question}")
-    ]
-)
+# Iniciar sesión en Hugging Face (coloca tu token aquí)
+huggingface_token = "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"
+login(huggingface_token)
 
-# Set up the Streamlit framework
-st.title('Langchain Chatbot With LLAMA3.1 model')  # Set the title of the Streamlit app
-input_text=st.text_input("Ask your question!")  # Create a text input field in the Streamlit app
+# Cargar el modelo Llama 2 y su tokenizer desde Hugging Face
+model_name = "TheBloke/Llama-2-13B-chat-GPTQ"  
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16)
 
-# Initialize the Ollama model
-llm=Ollama(model="llama2")
+# Crear la aplicación en Streamlit
+st.title('Chatbot con Llama 2 utilizando Hugging Face')
+input_text = st.text_input("Haz tu pregunta:")
 
-# Create a chain that combines the prompt and the Ollama model
-chain=prompt|llm
+# Función para generar la respuesta
+def generate_response(question):
+    inputs = tokenizer(question, return_tensors="pt").to("cuda")  # Si tienes GPU, usa "cuda"
+    outputs = model.generate(**inputs, max_length=512, do_sample=True, temperature=0.7)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-# Invoke the chain with the input text and display the output
+# Invocar el modelo y mostrar la respuesta en Streamlit
 if input_text:
-    st.write(chain.invoke({"question":input_text}))
+    with st.spinner("Generando respuesta..."):
+        response = generate_response(input_text)
+        st.write(response)
