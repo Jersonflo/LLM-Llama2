@@ -1,29 +1,30 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-from huggingface_hub import login
+import ollama
 
-# Iniciar sesión en Hugging Face (coloca tu token aquí)
-huggingface_token = "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"
-login(huggingface_token)
+st.title("💬 llama2 (7B) Chatbot")
 
-# Cargar el modelo Llama 2 y su tokenizer desde Hugging Face
-model_name = "TheBloke/Llama-2-13B-chat-GPTQ"  
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16)
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
-# Crear la aplicación en Streamlit
-st.title('Chatbot con Llama 2 utilizando Hugging Face')
-input_text = st.text_input("Haz tu pregunta:")
+### Write Message History
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.chat_message(msg["role"], avatar="🧑‍💻").write(msg["content"])
+    else:
+        st.chat_message(msg["role"], avatar="🤖").write(msg["content"])
 
-# Función para generar la respuesta
-def generate_response(question):
-    inputs = tokenizer(question, return_tensors="pt").to("cuda")  # Si tienes GPU, usa "cuda"
-    outputs = model.generate(**inputs, max_length=512, do_sample=True, temperature=0.7)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+## Generator for Streaming Tokens
+def generate_response():
+    response = ollama.chat(model='llama2', stream=True, messages=st.session_state.messages)
+    for partial_resp in response:
+        token = partial_resp["message"]["content"]
+        st.session_state["full_message"] += token
+        yield token
 
-# Invocar el modelo y mostrar la respuesta en Streamlit
-if input_text:
-    with st.spinner("Generando respuesta..."):
-        response = generate_response(input_text)
-        st.write(response)
+if prompt := st.chat_input():
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.chat_message("user", avatar="🧑‍💻").write(prompt)
+    st.session_state["full_message"] = ""
+    st.chat_message("assistant", avatar="🤖").write_stream(generate_response)
+    st.session_state.messages.append({"role": "assistant", "content": st.session_state["full_message"]})   
+    
