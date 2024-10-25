@@ -4,28 +4,27 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate
 import torch
 import os
+import subprocess
 
 
-# Ruta al archivo del modelo GPTQ descargado
-model_path = "/Users/mareo/Desktop/LLM-Llama2/llama-2-7b-chat.ggmlv3.q2_K.bin"
 
-# Cargar el tokenizador y el modelo desde el archivo .bin
-@st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.float16,  # Usa float16 si tienes GPU compatible
-        device_map="auto" if torch.cuda.is_available() else None  # Ajusta a CPU si no hay GPU
-    )
-    return tokenizer, model
+model_path = "/Users/mareo/Desktop/LLM-Llama2/llama_model/Llama-3.1-8B-Lexi-Uncensored_V2_Q5.gguf"
+    
 
-# Generar la respuesta usando el modelo cargado
+# Función para generar respuestas usando llama.cpp
 def generate_response(prompt):
-    tokenizer, model = load_model()
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    outputs = model.generate(**inputs, max_length=512, temperature=0.7)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    try:
+        # Ejecuta llama.cpp con el prompt como entrada
+        result = subprocess.run(
+            ['./llama.cpp/llama-cli', '-m', model_path, '-p', prompt, '--n_predict', '128'],
+            capture_output=True,
+            text=True
+        )
+        # Retorna la salida generada por el modelo
+        return result.stdout.strip()
+    except Exception as e:
+        st.error(f"Ocurrió un error: {e}")
+        return ""
 
 # Función para manejar la entrada del usuario
 def submit_message():
@@ -192,9 +191,6 @@ def main():
     )
 
     
-
-    
-
     # Casilla de entrada con on_change para manejar el evento de envío
     st.text_input("¿Qué deseas saber?:", key="user_input", on_change=submit_message)
     st.info("Presiona Enter para enviar tu mensaje.")
